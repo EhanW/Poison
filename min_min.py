@@ -36,7 +36,7 @@ def get_args():
 class MinMin(object):
     def __init__(self):
         self.model, self.optimizer, self.scheduler = None, None, None
-        self.perts = torch.zeros(args.train_total)
+        self.perts = torch.zeros((args.train_total, 3, 32, 32))
 
     def run(self):
         self.model_init()
