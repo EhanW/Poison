@@ -65,7 +65,7 @@ class MinMin(object):
         self.perts = perts
 
     def min_min(self):
-        num_batches = 0
+        num_batches = 1
         for epoch in range(args.epochs):
             self.model.train()
             loss_list = []
