@@ -23,6 +23,31 @@ def pgd_inf(model, data, target, epsilon=8/255, alpha=2/255, steps=10, random_st
     return adv_data
 
 
+def pgd_minminmax(model, data, target, epsilon=8/255, alpha=2/255, steps=10, random_start=True, reverse_direction=False):
+    training_mode = model.training
+    model.eval()
+    delta = torch.zeros_like(data, requires_grad=True)
+    if random_start:
+        delta.data.uniform_(-epsilon, epsilon)
+    for _ in range(steps):
+        with torch.enable_grad():
+            if reverse_direction:
+                loss = -F.cross_entropy(model(delta+data), target)
+            else:
+                loss = F.cross_entropy(model(delta+data), target)
+        grad = torch.autograd.grad(loss, [delta])[0].data
+        delta.data = delta.data + alpha*torch.sign(grad)
+        delta.data = torch.clamp(delta.data, -epsilon, epsilon)
+        delta.data = torch.clamp(data.data+delta.data, 0, 1) - data.data
+    adv_data = delta.data + data.data
+    model.train(training_mode)
+    return adv_data
+
+
+
+
+
+
 def pgd_2(model, data, target, epsilon=1.5, alpha=0.2, steps=10, rand_init=False):
     training_mode = model.training
     model.eval()

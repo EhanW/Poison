@@ -1,3 +1,5 @@
+import torch
+
 from networks import *
 from data import get_train_loader, get_test_loader
 from torch.utils.tensorboard import SummaryWriter
@@ -25,18 +27,20 @@ def get_args():
     parser.add_argument('--weight-decay', default=5e-4, type=float)
     parser.add_argument('--milestones', default=(30, 45), type=tuple[int])
     parser.add_argument('--gamma', default=0.1, type=float)
+    parser.add_argument('--train_total', default=50000, type=int)
+    parser.add_argument('--interval', default=10, type=int)
+    parser.add_argument('--stop-error',default=0.01, type=float)
     return parser.parse_args()
 
 
 class MinMin(object):
     def __init__(self):
         self.model, self.optimizer, self.scheduler = None, None, None
-        self.perts = None
+        self.perts = torch.zeros(args.train_total)
 
     def run(self):
         self.model_init()
         self.min_min()
-        self.get_pert()
         self.retrain()
 
     def model_init(self):
@@ -44,7 +48,7 @@ class MinMin(object):
         self.optimizer = SGD(self.model.parameters(), lr=args.lr, weight_decay=args.weight_decay, momentum=args.momentum)
         self.scheduler = MultiStepLR(optimizer=self.optimizer, milestones=args.milestones, gamma=args.gamma)
 
-    def get_pert(self):
+    def update_pert(self):
         perts = []
         indices = []
         for data, target, index in train_loader:
@@ -61,28 +65,40 @@ class MinMin(object):
         self.perts = perts
 
     def min_min(self):
+        num_batches = 0
         for epoch in range(args.epochs):
             self.model.train()
             loss_list = []
-            total = 0
-            for data, target, index in train_loader:
-                total += len(data)
+
+            for batch_idx, (data, target, index) in enumerate(train_loader):
+                self.model.train()
+                num_batches += batch_idx
+                data += self.perts[index]
                 data, target = data.to(args.device), target.to(args.device)
-                data = pgd_inf(self.model, data, target, args.epsilon, args.alpha, args.steps, args.random_start, reverse_direction=True)
                 loss = F.cross_entropy(self.model(data), target)
                 self.optimizer.zero_grad()
                 loss.backward()
                 loss_list.append(loss.item()*len(data))
                 self.optimizer.step()
-            self.scheduler.step()
-            avg_loss = np.array(loss_list).sum().item()/total
+                print(epoch, batch_idx)
+                if num_batches % args.interval == 0:
+                    self.update_pert()
+                    test_error = 1 - self.test(test_loader)
+                    if test_error <= args.stop_error:
+                        break
+
+            else:
+                continue
+            avg_loss = np.array(loss_list).sum().item()/args.train_total
             train_acc = self.test(train_loader)
             test_acc = self.test(test_loader)
             logger.add_scalar('minmin_avg_loss', avg_loss, global_step=epoch)
             logger.add_scalar('minmin_test_acc', test_acc, global_step=epoch)
             logger.add_scalar('minmin_train_acc', train_acc, global_step=epoch)
+            self.scheduler.step()
+            break
 
-    def test(self,loader):
+    def test(self, loader):
         self.model.eval()
         total = 0
         correct = 0
