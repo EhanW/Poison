@@ -12,19 +12,18 @@ import argparse
 def get_args():
     parser = argparse.ArgumentParser('CIFAR10-MIN-MIN')
     parser.add_argument('--device', default='cuda:1')
-    parser.add_argument('--adv-train', default=False)
     parser.add_argument('--batch-size', default=128, type=float)
     parser.add_argument('--num_classes', default=10, type=int)
     parser.add_argument('--epsilon', default=8/255, type=float)
-    parser.add_argument('--alpha', default=2/255, type=float)
-    parser.add_argument('--steps', default=10, type=int)
+    parser.add_argument('--alpha', default=0.8/255, type=float)
+    parser.add_argument('--steps', default=20, type=int)
     parser.add_argument('--random-start', default=True)
     parser.add_argument('--restarts', default=1, type=int)
-    parser.add_argument('--epochs', default=200, type=int)
+    parser.add_argument('--epochs', default=60, type=int)
     parser.add_argument('--lr', default=0.1, type=float)
     parser.add_argument('--momentum', default=0.9, type=float)
     parser.add_argument('--weight-decay', default=5e-4, type=float)
-    parser.add_argument('--milestones', default=(100, 150), type=tuple[int])
+    parser.add_argument('--milestones', default=(30, 45), type=tuple[int])
     parser.add_argument('--gamma', default=0.1, type=float)
     return parser.parse_args()
 
@@ -87,7 +86,7 @@ class MinMin(object):
         self.model.eval()
         total = 0
         correct = 0
-        for data, target in loader:
+        for data, target, index in loader:
             data, target = data.to(args.device), target.to(args.device)
             total += len(data)
             with torch.no_grad():
@@ -125,7 +124,7 @@ if __name__ == '__main__':
     test_loader = get_test_loader(args.batch_size)
     train_loader = get_train_loader(args.batch_size)
     path = os.path.join('logs/min_min', model_name)
-    path = os.path.join(path, f'ls={args.epochs}')
+    path = os.path.join(path, f'epochs={args.epochs}')
     os.makedirs(path, exist_ok=True)
     logger = SummaryWriter(log_dir=path)
     logger.add_text('args', str(args))
