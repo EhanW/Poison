@@ -17,8 +17,8 @@ def get_args():
     parser.add_argument('--batch-size', default=128, type=float)
     parser.add_argument('--num_classes', default=10, type=int)
     parser.add_argument('--epsilon', default=8/255, type=float)
-    parser.add_argument('--alpha', default=0.8/255, type=float)
-    parser.add_argument('--steps', default=20, type=int)
+    parser.add_argument('--alpha', default=2/255, type=float)
+    parser.add_argument('--steps', default=7, type=int)
     parser.add_argument('--random-start', default=True)
     parser.add_argument('--restarts', default=1, type=int)
     parser.add_argument('--epochs', default=60, type=int)
@@ -28,8 +28,8 @@ def get_args():
     parser.add_argument('--milestones', default=(30, 45), type=tuple[int])
     parser.add_argument('--gamma', default=0.1, type=float)
     parser.add_argument('--train_total', default=50000, type=int)
-    parser.add_argument('--interval', default=10, type=int)
-    parser.add_argument('--stop-error',default=0.01, type=float)
+    parser.add_argument('--interval', default=20, type=int)
+    parser.add_argument('--stop-error', default=0.01, type=float)
     return parser.parse_args()
 
 
@@ -84,19 +84,19 @@ class MinMin(object):
                 if num_batches % args.interval == 0:
                     print('yes')
                     self.update_pert()
-                    test_error = 1 - self.test(test_loader)
+                    test_error = self.test(test_loader)
                     if test_error <= args.stop_error:
                         break
 
             else:
+                avg_loss = np.array(loss_list).sum().item()/args.train_total
+                train_acc = self.test(train_loader)
+                test_acc = self.test(test_loader)
+                logger.add_scalar('minmin_avg_loss', avg_loss, global_step=epoch)
+                logger.add_scalar('minmin_test_acc', test_acc, global_step=epoch)
+                logger.add_scalar('minmin_train_acc', train_acc, global_step=epoch)
+                self.scheduler.step()
                 continue
-            avg_loss = np.array(loss_list).sum().item()/args.train_total
-            train_acc = self.test(train_loader)
-            test_acc = self.test(test_loader)
-            logger.add_scalar('minmin_avg_loss', avg_loss, global_step=epoch)
-            logger.add_scalar('minmin_test_acc', test_acc, global_step=epoch)
-            logger.add_scalar('minmin_train_acc', train_acc, global_step=epoch)
-            self.scheduler.step()
             break
 
     def test(self, loader):
