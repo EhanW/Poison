@@ -72,7 +72,7 @@ class MinMin(object):
 
             for batch_idx, (data, target, index) in enumerate(train_loader):
                 self.model.train()
-                num_batches += batch_idx
+                num_batches += 1
                 data += self.perts[index]
                 data, target = data.to(args.device), target.to(args.device)
                 loss = F.cross_entropy(self.model(data), target)
@@ -80,8 +80,9 @@ class MinMin(object):
                 loss.backward()
                 loss_list.append(loss.item()*len(data))
                 self.optimizer.step()
-                print(epoch, batch_idx)
+                print(epoch, batch_idx, num_batches, num_batches%args.interval)
                 if num_batches % args.interval == 0:
+                    print('yes')
                     self.update_pert()
                     test_error = 1 - self.test(test_loader)
                     if test_error <= args.stop_error:
